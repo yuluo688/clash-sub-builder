@@ -1,0 +1,13 @@
+{
+  "name": "clash-sub-builder-worker",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^3.99.0"
+  }
+}

@@ -1,0 +1,19 @@
+name = "clash-sub-builder"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# 模式 A：从 GitHub Raw 读取订阅
+# 部署前请用 wrangler secret / vars 设置：
+#   GITHUB_RAW_URL = https://raw.githubusercontent.com/<user>/<repo>/main/output/all.yaml
+#   GITHUB_STATS_URL = https://raw.githubusercontent.com/<user>/<repo>/main/output/stats.json
+#   SUB_TOKEN = (可选)
+
+[vars]
+# 示例占位，部署时请覆盖为你的仓库 raw 地址
+GITHUB_RAW_URL = ""
+GITHUB_STATS_URL = ""
+
+# 模式 B（可选，KV）：取消注释并绑定 KV namespace
+# [[kv_namespaces]]
+# binding = "SUB_KV"
+# id = "your_kv_namespace_id"
