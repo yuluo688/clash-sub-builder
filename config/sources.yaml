@@ -1,6 +1,6 @@
 # 公开订阅源列表
 # 仅使用发布方明确公开的订阅 URL；使用前请确认符合所在地法律和你的使用权限。
-# 以下地址均已于 2026-08-08 下载并由当前解析器验证；单个源失败不会中断整次任务。
+# 单个源失败不会中断整次任务。
 
 sources:
   - name: openrunner_daily_clash_20260808
@@ -49,6 +49,55 @@ sources:
 
   - name: puddincat_bestclash
     url: "https://raw.githubusercontent.com/PuddinCat/BestClash/refs/heads/main/proxies.yaml"
+    enabled: true
+
+  # ---- 补充公开源 ----
+  - name: aiboboxx_clashfree
+    url: "https://raw.githubusercontent.com/aiboboxx/clashfree/main/clash.yml"
+    enabled: true
+
+  - name: flik6_getnode
+    url: "https://raw.githubusercontent.com/Flik6/getNode/main/clash.yaml"
+    enabled: true
+
+  - name: ripaojiedian_freenode
+    url: "https://raw.githubusercontent.com/ripaojiedian/freenode/main/clash"
+    enabled: true
+
+  - name: vxiaov_free_proxies
+    url: "https://raw.githubusercontent.com/vxiaov/free_proxies/main/clash/clash.provider.yaml"
+    enabled: true
+
+  - name: mlabalabala_v2ray_node
+    url: "https://raw.githubusercontent.com/mlabalabala/v2ray-node/main/node.txt4clash.yaml"
+    enabled: true
+
+  - name: ssrsub_clash
+    url: "https://raw.githubusercontent.com/ssrsub/ssr/master/Clash.yml"
+    enabled: true
+
+  - name: learnhard_provider_all
+    url: "https://raw.githubusercontent.com/learnhard-cn/free_proxy_ss/main/clash/providers/provider_all.yaml"
+    enabled: true
+
+  - name: pawdroid_free_servers
+    url: "https://raw.githubusercontent.com/Pawdroid/Free-servers/main/sub"
+    enabled: true
+
+  - name: free18_v2ray
+    url: "https://raw.githubusercontent.com/free18/v2ray/main/v.txt"
+    enabled: true
+
+  - name: mfuu_v2ray
+    url: "https://raw.githubusercontent.com/mfuu/v2ray/master/v2ray"
+    enabled: true
+
+  - name: jsnzkpg
+    url: "https://raw.githubusercontent.com/Jsnzkpg/Jsnzkpg/Jsnzkpg/Jsnzkpg"
+    enabled: true
+
+  - name: mahdibland_sub_base64
+    url: "https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_merge_base64.txt"
     enabled: true
 
   # 示例（默认禁用，请替换为你自己的公开源后启用）

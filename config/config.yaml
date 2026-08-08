@@ -11,7 +11,8 @@ checker:
   # 超过该延迟的节点丢弃（毫秒）
   max_latency: 800
   # 测速 URL（经代理核心真实请求）
-  test_url: "https://www.gstatic.com/generate_204"
+  # CN 场景：Cloudflare 204 比 gstatic 更稳，减少「节点活着但测 Google 超时」的误杀
+  test_url: "https://cp.cloudflare.com/generate_204"
   # Mihomo 二进制路径（scripts/download_mihomo.py 下载到此）
   mihomo_path: "bin/mihomo"
   # External Controller
@@ -35,7 +36,8 @@ generator:
   external_controller: "127.0.0.1:9090"
   url_test_interval: 300
   url_test_tolerance: 50
-  url_test_url: "https://www.gstatic.com/generate_204"
+  # 写入订阅内 URLTest 组；与 checker.test_url 保持一致，方便客户端测速
+  url_test_url: "https://cp.cloudflare.com/generate_204"
 
 fetcher:
   timeout: 30
@@ -49,7 +51,7 @@ geo:
   enable_dns: true
 
 schedule:
-  hours: 6
+  hours: 4
 
 output:
   path: "output/all.yaml"

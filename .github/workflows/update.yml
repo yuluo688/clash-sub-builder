@@ -2,8 +2,8 @@ name: Update Proxy Subscription
 
 on:
   schedule:
-    # 每 6 小时（UTC）
-    - cron: "0 */6 * * *"
+    # 每 4 小时（UTC）
+    - cron: "0 */4 * * *"
   workflow_dispatch:
 
 permissions:
