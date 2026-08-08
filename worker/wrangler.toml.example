@@ -4,9 +4,11 @@ compatibility_date = "2024-11-01"
 
 # 模式 A：从 GitHub Raw 读取订阅
 # 部署前请用 wrangler secret / vars 设置：
-#   GITHUB_RAW_URL = https://raw.githubusercontent.com/<user>/<repo>/main/output/all.yaml
-#   GITHUB_STATS_URL = https://raw.githubusercontent.com/<user>/<repo>/main/output/stats.json
+#   GITHUB_RAW_URL / GITHUB_STATS_URL
 #   SUB_TOKEN = (可选)
+#   PROFILE_NAME = 客户端卡片显示名
+#   subscription-userinfo 装饰字段（无真实计费，仅展示）：
+#     SUB_TOTAL_BYTES / SUB_UPLOAD_BYTES / SUB_DOWNLOAD_BYTES / SUB_EXPIRE
 #
 # 使用：
 #   cp wrangler.toml.example wrangler.toml
@@ -15,6 +17,11 @@ compatibility_date = "2024-11-01"
 [vars]
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/<you>/<repo>/main/output/all.yaml"
 GITHUB_STATS_URL = "https://raw.githubusercontent.com/<you>/<repo>/main/output/stats.json"
+PROFILE_NAME = "clash-sub-builder"
+PROFILE_UPDATE_INTERVAL = "4"
+# 24TiB、已用 0、到期 2099-12-31（Unix）
+# SUB_TOTAL_BYTES = "26388279066624"
+# SUB_EXPIRE = "4102329600"
 
 # 模式 B（可选，KV）：取消注释并绑定 KV namespace
 # [[kv_namespaces]]

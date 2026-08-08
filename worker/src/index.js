@@ -6,9 +6,42 @@
  *   GITHUB_RAW_URL  - all.yaml 的 raw 地址（必填）
  *   GITHUB_STATS_URL - stats.json 的 raw 地址（可选）
  *   SUB_TOKEN       - 可选访问令牌；未设置则公开
+ *   PROFILE_NAME    - 客户端订阅显示名（默认 clash-sub-builder）
+ *   PROFILE_UPDATE_INTERVAL - 建议更新间隔小时（默认 4）
+ *   SUB_TOTAL_BYTES / SUB_UPLOAD_BYTES / SUB_DOWNLOAD_BYTES / SUB_EXPIRE
+ *                   - subscription-userinfo（默认 24TB / 0 / 0 / 2099-12-31）
  */
 
 const DEFAULT_CACHE_SECONDS = 300;
+/** 24 TiB */
+const DEFAULT_TOTAL_BYTES = 24 * 1024 * 1024 * 1024 * 1024;
+/** 2099-12-31 00:00:00 UTC */
+const DEFAULT_EXPIRE_TS = 4102329600;
+
+function utf8ToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+/** Clash / Clash Verge 订阅卡片：名称、流量条、到期日、更新周期 */
+function profileMetaHeaders(env) {
+  const name = (env.PROFILE_NAME || "clash-sub-builder").trim() || "clash-sub-builder";
+  const updateHours = String(env.PROFILE_UPDATE_INTERVAL || "4");
+  const total = Number(env.SUB_TOTAL_BYTES || DEFAULT_TOTAL_BYTES);
+  const upload = Number(env.SUB_UPLOAD_BYTES || 0);
+  const download = Number(env.SUB_DOWNLOAD_BYTES || 0);
+  const expire = Number(env.SUB_EXPIRE || DEFAULT_EXPIRE_TS);
+  const safeName = name.replace(/["\\\r\n]/g, "");
+
+  return {
+    "content-disposition": `attachment; filename="${safeName}.yaml"`,
+    "profile-title": `base64:${utf8ToBase64(name)}`,
+    "profile-update-interval": updateHours,
+    "subscription-userinfo": `upload=${upload}; download=${download}; total=${total}; expire=${expire}`,
+  };
+}
 
 function unauthorized() {
   return new Response(JSON.stringify({ error: "unauthorized" }), {
@@ -78,11 +111,12 @@ async function handleSub(request, env) {
     );
   }
 
+  const meta = profileMetaHeaders(env);
   const upstream = await fetchUpstream(rawUrl, request);
   if (upstream.status === 304) {
     return new Response(null, {
       status: 304,
-      headers: withCacheHeaders(upstream),
+      headers: withCacheHeaders(upstream, meta),
     });
   }
   if (!upstream.ok) {
@@ -108,7 +142,7 @@ async function handleSub(request, env) {
   if (ifNoneMatch && ifNoneMatch === etag) {
     return new Response(null, {
       status: 304,
-      headers: withCacheHeaders(upstream, { ETag: etag }),
+      headers: withCacheHeaders(upstream, { ETag: etag, ...meta }),
     });
   }
 
@@ -117,8 +151,7 @@ async function handleSub(request, env) {
     headers: withCacheHeaders(upstream, {
       ETag: etag,
       "content-type": "text/yaml; charset=utf-8",
-      "content-disposition": 'inline; filename="all.yaml"',
-      "profile-update-interval": "6",
+      ...meta,
     }),
   });
 }
