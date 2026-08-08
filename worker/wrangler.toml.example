@@ -7,11 +7,14 @@ compatibility_date = "2024-11-01"
 #   GITHUB_RAW_URL = https://raw.githubusercontent.com/<user>/<repo>/main/output/all.yaml
 #   GITHUB_STATS_URL = https://raw.githubusercontent.com/<user>/<repo>/main/output/stats.json
 #   SUB_TOKEN = (可选)
+#
+# 使用：
+#   cp wrangler.toml.example wrangler.toml
+#   再把下面的占位地址改成你的仓库 Raw URL
 
 [vars]
-# 示例占位，部署时请覆盖为你的仓库 raw 地址
-GITHUB_RAW_URL = ""
-GITHUB_STATS_URL = ""
+GITHUB_RAW_URL = "https://raw.githubusercontent.com/<you>/<repo>/main/output/all.yaml"
+GITHUB_STATS_URL = "https://raw.githubusercontent.com/<you>/<repo>/main/output/stats.json"
 
 # 模式 B（可选，KV）：取消注释并绑定 KV namespace
 # [[kv_namespaces]]

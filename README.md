@@ -102,7 +102,7 @@ Clash Verge Rev / Mihomo / 其他 Clash Meta 客户端
 │   └── stats.json
 ├── worker/
 │   ├── src/index.js
-│   ├── wrangler.toml
+│   ├── wrangler.toml.example   # 复制为 wrangler.toml 后填写
 │   └── package.json
 ├── scripts/
 │   └── download_mihomo.py
@@ -217,19 +217,23 @@ npx wrangler login
 
 ### 8.2 配置变量
 
-编辑 `worker/wrangler.toml` 或使用命令行：
-
 ```bash
-# 模式 A：指向你仓库 main 分支的 raw 文件
-npx wrangler secret put SUB_TOKEN          # 可选；不设置则公开
+# 从示例生成本地配置（wrangler.toml 已被 gitignore，不会提交）
+cp wrangler.toml.example wrangler.toml
 ```
 
-在 `wrangler.toml` 的 `[vars]` 中设置（或 Dashboard → Worker → Settings → Variables）：
+编辑 `worker/wrangler.toml`，把 Raw 地址改成你的仓库：
 
 ```toml
 [vars]
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/<you>/<repo>/main/output/all.yaml"
 GITHUB_STATS_URL = "https://raw.githubusercontent.com/<you>/<repo>/main/output/stats.json"
+```
+
+可选访问令牌：
+
+```bash
+npx wrangler secret put SUB_TOKEN          # 不设置则公开
 ```
 
 > 私有仓库 Raw 默认不可匿名读取。模式 A 要求仓库 **Public**，或改用模式 B。

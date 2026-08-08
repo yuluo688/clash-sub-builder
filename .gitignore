@@ -25,5 +25,7 @@ data/GeoLite2-Country.mmdb
 worker/node_modules/
 worker/.wrangler/
 worker/dist/
+# 本地部署配置（从 wrangler.toml.example 复制后填写）
+worker/wrangler.toml
 .DS_Store
 Thumbs.db
