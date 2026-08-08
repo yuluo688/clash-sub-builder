@@ -1,0 +1,57 @@
+# 公开订阅源列表
+# 仅使用发布方明确公开的订阅 URL；使用前请确认符合所在地法律和你的使用权限。
+# 以下地址均已于 2026-08-08 下载并由当前解析器验证；单个源失败不会中断整次任务。
+
+sources:
+  - name: openrunner_daily_clash_20260808
+    url: "https://free.datiya.com/uploads/20260808-clash.yaml"
+    enabled: true
+
+  - name: proxypool_clash_meta
+    url: "https://raw.githubusercontent.com/snakem982/proxypool/main/source/clash-meta-2.yaml"
+    enabled: true
+
+  - name: shadowsocks_aggregator
+    url: "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity.yml"
+    enabled: true
+
+  - name: nomorewalls
+    url: "https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list.yml"
+    enabled: true
+
+  - name: anaer_sub
+    url: "https://raw.githubusercontent.com/anaer/Sub/main/clash.yaml"
+    enabled: true
+
+  - name: auto_merge_public_nodes
+    url: "https://raw.githubusercontent.com/chengaopan/AutoMergePublicNodes/master/list.yml"
+    enabled: true
+
+  - name: ermaozi_subscribe
+    url: "https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/clash.yml"
+    enabled: true
+
+  - name: ronghuaxueleng_get_v2
+    url: "https://raw.githubusercontent.com/ronghuaxueleng/get_v2/main/pub/combine.yaml"
+    enabled: true
+
+  - name: ts_sf_fly
+    url: "https://raw.githubusercontent.com/ts-sf/fly/main/clash"
+    enabled: true
+
+  - name: yaney01
+    url: "https://raw.githubusercontent.com/yaney01/Yaney01/main/temporary"
+    enabled: true
+
+  - name: passcro_speednodes
+    url: "https://raw.githubusercontent.com/zhangkaiitugithub/passcro/main/speednodes.yaml"
+    enabled: true
+
+  - name: puddincat_bestclash
+    url: "https://raw.githubusercontent.com/PuddinCat/BestClash/refs/heads/main/proxies.yaml"
+    enabled: true
+
+  # 示例（默认禁用，请替换为你自己的公开源后启用）
+  - name: example_base64
+    url: "https://example.com/v2ray.txt"
+    enabled: false

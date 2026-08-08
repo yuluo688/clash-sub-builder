@@ -1,0 +1,56 @@
+# 全局运行配置
+
+checker:
+  enabled: true
+  # Mihomo delay API 超时（毫秒）
+  timeout: 5000
+  # 并发测速数量（GitHub Actions 建议 10~20）
+  concurrency: 20
+  # 单节点失败重试次数
+  retries: 1
+  # 超过该延迟的节点丢弃（毫秒）
+  max_latency: 800
+  # 测速 URL（经代理核心真实请求）
+  test_url: "https://www.gstatic.com/generate_204"
+  # Mihomo 二进制路径（scripts/download_mihomo.py 下载到此）
+  mihomo_path: "bin/mihomo"
+  # External Controller
+  api_host: "127.0.0.1"
+  api_port: 9090
+  # 每个临时配置最多塞入多少节点（过大可能导致启动慢）
+  batch_size: 100
+
+filter:
+  max_nodes_total: 500
+  max_nodes_per_country: 50
+
+generator:
+  include_latency_in_name: true
+  include_city_in_name: false
+  mixed_port: 7890
+  allow_lan: false
+  mode: rule
+  log_level: info
+  ipv6: true
+  external_controller: "127.0.0.1:9090"
+  url_test_interval: 300
+  url_test_tolerance: 50
+  url_test_url: "https://www.gstatic.com/generate_204"
+
+fetcher:
+  timeout: 30
+  max_retries: 2
+  user_agent: "clash-sub-builder/1.0"
+
+geo:
+  # 可选：MaxMind GeoLite2-Country.mmdb 本地路径
+  # 未配置或文件不存在时，自动回退到名称关键词识别
+  mmdb_path: "data/GeoLite2-Country.mmdb"
+  enable_dns: true
+
+schedule:
+  hours: 6
+
+output:
+  path: "output/all.yaml"
+  stats_path: "output/stats.json"
