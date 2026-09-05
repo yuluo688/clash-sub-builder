@@ -1,30 +1,30 @@
 {
   "status": "ok",
-  "updated_at": "2026-09-05T14:50:23Z",
-  "nodes": 122,
-  "total": 122,
+  "updated_at": "2026-09-05T18:20:08Z",
+  "nodes": 121,
+  "total": 121,
   "countries": {
-    "OTHER": 50,
-    "GB": 26,
+    "OTHER": 43,
+    "GB": 28,
     "NL": 16,
-    "US": 13,
+    "US": 15,
     "JP": 5,
     "CA": 4,
+    "KR": 3,
     "TW": 3,
     "DE": 2,
     "FR": 1,
-    "KR": 1,
-    "NO": 1
+    "IE": 1
   },
   "pipeline": {
     "sources": 24,
     "downloaded": 19,
-    "raw_nodes": 6744,
-    "parsed": 6744,
-    "duplicates_removed": 906,
-    "tested": 5838,
-    "alive": 192,
-    "filtered": 122,
+    "raw_nodes": 6751,
+    "parsed": 6751,
+    "duplicates_removed": 908,
+    "tested": 5843,
+    "alive": 186,
+    "filtered": 121,
     "countries": 11
   }
 }
