@@ -1,6 +1,6 @@
 {
   "status": "ok",
-  "updated_at": "2026-09-24T08:03:55Z",
+  "updated_at": "2026-09-24T08:54:10Z",
   "nodes": 400,
   "total": 400,
   "countries": {
@@ -48,13 +48,13 @@
   "pipeline": {
     "sources": 18,
     "downloaded": 18,
-    "raw_nodes": 7552,
-    "parsed": 7552,
-    "duplicates_removed": 1189,
-    "tested": 399,
-    "alive": 6,
+    "raw_nodes": 7553,
+    "parsed": 7553,
+    "duplicates_removed": 1193,
+    "tested": 0,
+    "alive": 0,
     "filtered": 400,
     "countries": 40,
-    "cn_chain": "verified"
+    "cn_chain": "fallback"
   }
 }
