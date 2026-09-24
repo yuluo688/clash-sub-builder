@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from itertools import zip_longest
 
 from src.models import Node
 
 logger = logging.getLogger(__name__)
+
+
+def _round_robin(groups: list[list[Node]]) -> list[Node]:
+    return [node for row in zip_longest(*groups) for node in row if node is not None]
 
 
 def is_complete(node: Node) -> bool:
@@ -48,19 +53,37 @@ def filter_nodes(
                 continue
         alive.append(n)
 
-    # 按国家分组，延迟升序
+    # 经 Runner 测速时按延迟筛选；未测速时跨来源、国家交错取样，避免
+    # 输入顺序或国家名排序将配额全部分给少数来源/地区。
     by_cc: dict[str, list[Node]] = defaultdict(list)
     for n in alive:
         cc = (n.country_code or "OTHER").upper()
         by_cc[cc].append(n)
 
-    selected: list[Node] = []
-    for cc, group in by_cc.items():
-        group.sort(key=lambda x: (x.latency if x.latency is not None else 10**9, x.name))
-        selected.extend(group[: max_nodes_per_country if max_nodes_per_country > 0 else len(group)])
+    if require_latency:
+        selected: list[Node] = []
+        for group in by_cc.values():
+            group.sort(key=lambda x: (x.latency, x.name))
+            selected.extend(group[:max_nodes_per_country] if max_nodes_per_country > 0 else group)
+        selected.sort(key=lambda x: (x.latency, x.country_code, x.name))
+    else:
+        per_country: list[list[Node]] = []
+        for group in by_cc.values():
+            by_source: dict[str, list[Node]] = defaultdict(list)
+            for node in group:
+                by_source[node.original_source].append(node)
+            for source_nodes in by_source.values():
+                source_nodes.sort(
+                    key=lambda node: (
+                        node.latency is None or node.latency <= 0,
+                        node.latency if node.latency is not None and node.latency > 0 else float("inf"),
+                    )
+                )
+            balanced = _round_robin(list(by_source.values()))
+            balanced.sort(key=lambda node: node.latency is None or node.latency <= 0)
+            per_country.append(balanced[:max_nodes_per_country] if max_nodes_per_country > 0 else balanced)
+        selected = _round_robin(per_country)
 
-    # 全局按延迟排序后截断
-    selected.sort(key=lambda x: (x.latency if x.latency is not None else 10**9, x.country_code, x.name))
     if max_nodes_total > 0:
         selected = selected[:max_nodes_total]
 

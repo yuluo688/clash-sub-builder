@@ -35,13 +35,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Check whether Mihomo is needed
+        id: checker
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          from pathlib import Path
+          import yaml
+          cfg = yaml.safe_load(Path("config/config.yaml").read_text(encoding="utf-8")) or {}
+          print(f"enabled={str(bool((cfg.get('checker') or {}).get('enabled', True))).lower()}")
+          PY
+
       - name: Download Mihomo
+        if: steps.checker.outputs.enabled == 'true'
         run: python scripts/download_mihomo.py -o bin
 
       - name: Build subscription
         run: python main.py
         env:
           PYTHONUNBUFFERED: "1"
+          # Set these Secrets only when checker.dialer_proxy.enabled is true.
+          CN_DIALER_SERVER: ${{ secrets.CN_DIALER_SERVER }}
+          CN_DIALER_PORT: ${{ secrets.CN_DIALER_PORT }}
+          CN_DIALER_USERNAME: ${{ secrets.CN_DIALER_USERNAME }}
+          CN_DIALER_PASSWORD: ${{ secrets.CN_DIALER_PASSWORD }}
 
       - name: Validate output
         run: |

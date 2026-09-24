@@ -4,45 +4,121 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 from urllib.parse import quote
 
 import httpx
 
 from src.checker.mihomo import MihomoRunner, make_temp_proxy_name, resolve_mihomo_path
+from src.filter import is_complete
 from src.models import Node
 
 logger = logging.getLogger(__name__)
+
+
+def select_cn_dialer(
+    candidates: Sequence[Node],
+    *,
+    mihomo_path: str | None = None,
+    api_host: str = "127.0.0.1",
+    api_port: int = 9090,
+    timeout: int = 5000,
+    max_candidates: int = 5,
+    geo_url: str = "https://ipinfo.io/json",
+) -> Node | None:
+    """Only trust a candidate as a CN dialer after its HTTPS exit check returns CN."""
+    if not geo_url.startswith("https://"):
+        raise ValueError("checker.cn_chain.geo_url must use HTTPS")
+    binary = resolve_mihomo_path(mihomo_path)
+    if not binary:
+        logger.warning("Mihomo binary missing; CN dialer verification unavailable")
+        return None
+
+    for index, node in enumerate((n for n in candidates if is_complete(n)), start=1):
+        if index > max_candidates:
+            break
+        runner = MihomoRunner(binary=binary, api_host=api_host, api_port=api_port)
+        try:
+            proxy = node.to_clash_proxy()
+            proxy.pop("dialer-proxy", None)
+            runner.start([proxy])
+            with httpx.Client(
+                proxy=f"http://127.0.0.1:{runner.mixed_port}",
+                timeout=timeout / 1000.0 + 3.0,
+                trust_env=False,
+            ) as client:
+                response = client.get(geo_url)
+                response.raise_for_status()
+                country = response.json().get("country")
+            if isinstance(country, str) and country.upper() == "CN":
+                logger.info("CN dialer verified (candidate %d)", index)
+                return node
+            logger.info("CN dialer candidate %d has non-CN or unknown exit", index)
+        except Exception as exc:
+            logger.warning(
+                "CN dialer candidate %d verification failed (%s)", index, type(exc).__name__
+            )
+        finally:
+            runner.stop()
+    logger.warning("No verified CN dialer; leaving candidates for client-side checks")
+    return None
+
+
+def _build_test_urls(
+    test_url: str,
+    fallback_test_urls: Sequence[str] | str | None,
+) -> tuple[str, ...]:
+    """Build a stable, de-duplicated list of delay test targets."""
+    candidates: list[object] = [test_url]
+    if isinstance(fallback_test_urls, str):
+        candidates.append(fallback_test_urls)
+    elif fallback_test_urls:
+        candidates.extend(fallback_test_urls)
+
+    urls: list[str] = []
+    for candidate in candidates:
+        url = str(candidate).strip()
+        if url and url not in urls:
+            urls.append(url)
+
+    if not urls:
+        raise ValueError("at least one delay test URL is required")
+    return tuple(urls)
 
 
 async def _delay_async(
     client: httpx.AsyncClient,
     base_url: str,
     proxy_name: str,
-    test_url: str,
+    test_urls: tuple[str, ...],
     timeout_ms: int,
     retries: int,
 ) -> int | None:
     encoded = quote(proxy_name, safe="")
     url = f"{base_url}/proxies/{encoded}/delay"
-    params = {"url": test_url, "timeout": timeout_ms}
-    # httpx timeout 需略大于测速 timeout
+    # httpx timeout 需略大于测速 timeout。每次重试轮换目标，避免单一
+    # 204 站点被节点策略或临时网络故障误判为节点不可用。
     req_timeout = (timeout_ms / 1000.0) + 3.0
     for attempt in range(retries + 1):
+        test_url = test_urls[attempt % len(test_urls)]
         try:
-            r = await client.get(url, params=params, timeout=req_timeout)
+            r = await client.get(
+                url,
+                params={"url": test_url, "timeout": timeout_ms},
+                timeout=req_timeout,
+            )
             if r.status_code != 200:
-                continue
-            data = r.json()
-            delay = data.get("delay")
-            if delay is None:
-                continue
-            d = int(delay)
-            if d > 0:
-                return d
+                raise RuntimeError(f"delay API returned {r.status_code}")
+            delay = r.json().get("delay")
+            if delay is not None:
+                measured = int(delay)
+                if measured > 0:
+                    return measured
         except Exception:
-            if attempt >= retries:
-                return None
+            pass
+        if attempt < retries:
             await asyncio.sleep(0.2)
     return None
 
@@ -50,7 +126,7 @@ async def _delay_async(
 async def _test_batch_async(
     base_url: str,
     count: int,
-    test_url: str,
+    test_urls: tuple[str, ...],
     timeout_ms: int,
     concurrency: int,
     retries: int,
@@ -68,7 +144,7 @@ async def _test_batch_async(
                     client,
                     base_url,
                     name,
-                    test_url,
+                    test_urls,
                     timeout_ms,
                     retries,
                 )
@@ -85,15 +161,19 @@ def check_nodes_delay(
     concurrency: int = 20,
     retries: int = 1,
     test_url: str = "https://www.gstatic.com/generate_204",
+    fallback_test_urls: Sequence[str] | str | None = None,
     api_host: str = "127.0.0.1",
     api_port: int = 9090,
     batch_size: int = 100,
     enabled: bool = True,
+    dialer_proxy: dict[str, Any] | None = None,
 ) -> list[Node]:
     """
     使用 Mihomo 核心对节点做真实 delay 测试。
     - 按 batch 启动 mihomo，写入临时配置
     - 并发调用 /proxies/{name}/delay
+    - 每次重试轮换检测地址，任一地址成功即保留节点
+    - 可选通过 dialer_proxy 链接到大陆出口后再测候选节点
     - 单节点失败不中断
     """
     if not enabled:
@@ -105,6 +185,7 @@ def check_nodes_delay(
     if not nodes:
         return nodes
 
+    test_urls = _build_test_urls(test_url, fallback_test_urls)
     binary = resolve_mihomo_path(mihomo_path)
     if not binary:
         logger.error(
@@ -118,11 +199,12 @@ def check_nodes_delay(
     # 为避免名称冲突，测速时使用临时名；原始 node.name 保留
     total = len(nodes)
     logger.info(
-        "Delay check start: %d nodes, concurrency=%d, timeout=%dms, batch=%d",
+        "Delay check start: %d nodes, concurrency=%d, timeout=%dms, batch=%d, targets=%s",
         total,
         concurrency,
         timeout,
         batch_size,
+        ", ".join(test_urls),
     )
 
     alive = 0
@@ -137,6 +219,7 @@ def check_nodes_delay(
             binary=binary,
             api_host=api_host,
             api_port=api_port + (start // max(1, batch_size)) % 50,
+            dialer_proxy=dialer_proxy,
         )
         # 每批使用不同端口，避免 TIME_WAIT 冲突
         try:
@@ -145,7 +228,7 @@ def check_nodes_delay(
                 _test_batch_async(
                     base_url=runner.base_url,
                     count=len(batch),
-                    test_url=test_url,
+                    test_urls=test_urls,
                     timeout_ms=timeout,
                     concurrency=concurrency,
                     retries=retries,

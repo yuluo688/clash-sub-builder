@@ -13,17 +13,20 @@ import argparse
 import json
 import logging
 import sys
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from src.checker.delay import check_nodes_delay
-from src.deduplicate import deduplicate
+from src.checker.delay import check_nodes_delay, select_cn_dialer
+from src.checker.mihomo import resolve_dialer_proxy
+from src.deduplicate import deduplicate, fingerprint
 from src.fetcher import fetch_all_sources
-from src.filter import filter_nodes
+from src.filter import filter_nodes, is_complete
 from src.generator import country_stats, generate_yaml, validate_yaml_file
-from src.geo import annotate_countries
-from src.models import Stats
+from src.geo import annotate_countries, match_country_from_name
+from src.models import Node, Stats
+from src.parsers.clash import parse_clash_yaml
 from src.rename import rename_nodes
 from src.utils import deep_get, load_yaml, setup_logging
 
@@ -41,6 +44,38 @@ def load_config(config_path: Path, sources_path: Path) -> tuple[dict[str, Any], 
     return cfg, sources
 
 
+def cn_dialer_candidates(nodes: list[Node], previous_output: Path) -> list[Node]:
+    """Prefer last run's CN nodes, then newly fetched CN nodes, without duplicates."""
+    previous: list[Node] = []
+    if previous_output.is_file():
+        try:
+            previous = parse_clash_yaml(previous_output.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError) as exc:
+            logger.warning("Cannot read previous subscription for CN bootstrap: %s", exc)
+
+    # Reserve one attempt for an old known candidate; leave the rest for fresh sources.
+    candidates = [
+        n for n in previous if match_country_from_name(n.name) == "CN" and is_complete(n)
+    ][:1]
+    current, _ = filter_nodes(
+        [n for n in nodes if n.country_code == "CN"],
+        require_latency=False,
+        max_nodes_total=0,
+        max_nodes_per_country=0,
+    )
+    candidates.extend(current)
+    seen: set[str] = set()
+    unique: list[Node] = []
+    for node in candidates:
+        if not is_complete(node):
+            continue
+        key = fingerprint(node)
+        if key not in seen:
+            unique.append(node)
+            seen.add(key)
+    return unique
+
+
 def run(config_path: str, sources_path: str, skip_check: bool = False) -> int:
     setup_logging()
     stats = Stats()
@@ -56,6 +91,9 @@ def run(config_path: str, sources_path: str, skip_check: bool = False) -> int:
 
     cfg, sources = load_config(cfg_path, src_path)
     stats.sources = len([s for s in sources if s.get("enabled", True)])
+    out_path = Path(str(deep_get(cfg, "output", "path", default="output/all.yaml")))
+    if not out_path.is_absolute():
+        out_path = ROOT / out_path
 
     # --- fetch ---
     nodes, enabled_count, downloaded = fetch_all_sources(
@@ -70,66 +108,110 @@ def run(config_path: str, sources_path: str, skip_check: bool = False) -> int:
     stats.parsed = len(nodes)
     logger.info("Fetched raw nodes: %d from %d/%d sources", len(nodes), downloaded, enabled_count)
 
-    if not nodes:
-        logger.warning("No nodes parsed; will write empty subscription skeleton")
+    if not nodes and enabled_count:
+        logger.error("No nodes parsed from enabled sources; leaving existing subscription unchanged")
+        return 1
 
     # --- dedupe ---
     nodes, removed = deduplicate(nodes)
     stats.duplicates_removed = removed
 
-    # --- delay check (Mihomo real proxy delay) ---
-    checker_enabled = bool(deep_get(cfg, "checker", "enabled", default=True)) and not skip_check
-    if nodes:
-        nodes = check_nodes_delay(
-            nodes,
-            mihomo_path=str(deep_get(cfg, "checker", "mihomo_path", default="bin/mihomo")),
-            timeout=int(deep_get(cfg, "checker", "timeout", default=5000)),
-            concurrency=int(deep_get(cfg, "checker", "concurrency", default=20)),
-            retries=int(deep_get(cfg, "checker", "retries", default=1)),
-            test_url=str(
-                deep_get(
-                    cfg,
-                    "checker",
-                    "test_url",
-                    default="https://www.gstatic.com/generate_204",
-                )
-            ),
-            api_host=str(deep_get(cfg, "checker", "api_host", default="127.0.0.1")),
-            api_port=int(deep_get(cfg, "checker", "api_port", default=9090)),
-            batch_size=int(deep_get(cfg, "checker", "batch_size", default=100)),
-            enabled=checker_enabled,
-        )
-        stats.tested = len(nodes) if checker_enabled else 0
-        stats.alive = sum(1 for n in nodes if n.latency is not None and n.latency > 0)
-    else:
-        stats.tested = 0
-        stats.alive = 0
-
-    # 若 checker 关闭：不按延迟过滤（开发/离线模式）
-    require_latency = checker_enabled
-
-    # --- geo ---
+    # --- geo (CN bootstrap requires the country label before delay checking) ---
     nodes = annotate_countries(
         nodes,
         mmdb_path=str(deep_get(cfg, "geo", "mmdb_path", default="")) or None,
         enable_dns=bool(deep_get(cfg, "geo", "enable_dns", default=True)),
     )
 
+    # --- delay check (Mihomo real proxy delay) ---
+    checker_enabled = bool(deep_get(cfg, "checker", "enabled", default=True)) and not skip_check
+    cn_chain_enabled = checker_enabled and bool(
+        deep_get(cfg, "checker", "cn_chain", "enabled", default=False)
+    )
+    dialer_settings = deep_get(cfg, "checker", "dialer_proxy", default={})
+    if cn_chain_enabled and isinstance(dialer_settings, Mapping) and dialer_settings.get("enabled"):
+        raise ValueError("checker.cn_chain and checker.dialer_proxy cannot both be enabled")
+    dialer_proxy = (
+        resolve_dialer_proxy(dialer_settings)
+        if checker_enabled and not cn_chain_enabled
+        else None
+    )
+    max_nodes_total = int(deep_get(cfg, "filter", "max_nodes_total", default=500))
+    max_nodes_per_country = int(deep_get(cfg, "filter", "max_nodes_per_country", default=50))
+    check_options = dict(
+        mihomo_path=str(deep_get(cfg, "checker", "mihomo_path", default="bin/mihomo")),
+        timeout=int(deep_get(cfg, "checker", "timeout", default=5000)),
+        concurrency=int(deep_get(cfg, "checker", "concurrency", default=20)),
+        retries=int(deep_get(cfg, "checker", "retries", default=1)),
+        test_url=str(
+            deep_get(cfg, "checker", "test_url", default="https://www.gstatic.com/generate_204")
+        ),
+        fallback_test_urls=deep_get(cfg, "checker", "fallback_test_urls", default=[]),
+        api_host=str(deep_get(cfg, "checker", "api_host", default="127.0.0.1")),
+        api_port=int(deep_get(cfg, "checker", "api_port", default=9090)),
+        batch_size=int(deep_get(cfg, "checker", "batch_size", default=100)),
+    )
+    chain_status = "disabled"
+    if cn_chain_enabled:
+        cn_candidates = cn_dialer_candidates(nodes, out_path)
+        nodes, _ = filter_nodes(
+            nodes,
+            require_latency=False,
+            max_nodes_total=max_nodes_total,
+            max_nodes_per_country=max_nodes_per_country,
+        )
+        bootstrap = select_cn_dialer(
+            cn_candidates,
+            mihomo_path=check_options["mihomo_path"],
+            api_host=check_options["api_host"],
+            api_port=check_options["api_port"],
+            timeout=check_options["timeout"],
+            max_candidates=int(
+                deep_get(cfg, "checker", "cn_chain", "max_candidates", default=5)
+            ),
+            geo_url=str(
+                deep_get(cfg, "checker", "cn_chain", "geo_url", default="https://ipinfo.io/json")
+            ),
+        )
+        if bootstrap:
+            bootstrap_key = fingerprint(bootstrap)
+            targets = [node for node in nodes if fingerprint(node) != bootstrap_key]
+            check_nodes_delay(targets, dialer_proxy=bootstrap.to_clash_proxy(), **check_options)
+            stats.tested = len(targets)
+            chain_status = "verified"
+        else:
+            chain_status = "fallback"
+    elif nodes and checker_enabled:
+        check_nodes_delay(nodes, dialer_proxy=dialer_proxy, **check_options)
+        stats.tested = len(nodes)
+    else:
+        logger.info("Runner delay check disabled; client will test candidate nodes locally")
+        for node in nodes:
+            node.latency = None
+            node.score = 0.0
+    stats.alive = sum(1 for n in nodes if n.latency is not None and n.latency > 0)
+
+    # CN 链式测速只能判断从入口到候选节点的连通性；保留失败候选供客户端复测。
+    require_latency = checker_enabled and not cn_chain_enabled
+
     # --- filter ---
     max_latency = int(deep_get(cfg, "checker", "max_latency", default=800))
     nodes, filt_removed = filter_nodes(
         nodes,
         max_latency=max_latency,
-        max_nodes_total=int(deep_get(cfg, "filter", "max_nodes_total", default=500)),
-        max_nodes_per_country=int(deep_get(cfg, "filter", "max_nodes_per_country", default=50)),
+        max_nodes_total=max_nodes_total,
+        max_nodes_per_country=max_nodes_per_country,
         require_latency=require_latency,
     )
     stats.filtered = len(nodes)
+    if not nodes and enabled_count:
+        logger.error("No valid nodes after filtering; leaving existing subscription unchanged")
+        return 1
 
     # --- rename ---
     nodes = rename_nodes(
         nodes,
-        include_latency=bool(
+        include_latency=not cn_chain_enabled and bool(
             deep_get(cfg, "generator", "include_latency_in_name", default=True)
         ),
         include_city=bool(deep_get(cfg, "generator", "include_city_in_name", default=False)),
@@ -139,10 +221,6 @@ def run(config_path: str, sources_path: str, skip_check: bool = False) -> int:
     stats.countries = len(cstats)
 
     # --- generate ---
-    out_path = Path(str(deep_get(cfg, "output", "path", default="output/all.yaml")))
-    if not out_path.is_absolute():
-        out_path = ROOT / out_path
-
     generate_yaml(
         nodes,
         out_path,
@@ -185,7 +263,7 @@ def run(config_path: str, sources_path: str, skip_check: bool = False) -> int:
         "nodes": len(nodes),
         "total": len(nodes),
         "countries": cstats,
-        "pipeline": stats.to_dict(),
+        "pipeline": {**stats.to_dict(), "cn_chain": chain_status},
     }
     stats_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 

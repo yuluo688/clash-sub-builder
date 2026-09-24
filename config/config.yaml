@@ -1,18 +1,22 @@
 # 全局运行配置
 
 checker:
+  # Actions 先验证一个 CN 出口，再借它链式测试候选节点；失败节点仍由客户端复测。
   enabled: true
   # Mihomo delay API 超时（毫秒）
   timeout: 5000
   # 并发测速数量（GitHub Actions 建议 10~20）
   concurrency: 20
-  # 单节点失败重试次数
+  # 单节点测速尝试次数减一；配置备用地址后，每次尝试会轮换地址
   retries: 1
-  # 超过该延迟的节点丢弃（毫秒）
-  max_latency: 800
+  # 仅在 cn_chain 关闭时，超过该延迟的节点会丢弃（毫秒）
+  max_latency: 1200
   # 测速 URL（经代理核心真实请求）
   # CN 场景：Cloudflare 204 比 gstatic 更稳，减少「节点活着但测 Google 超时」的误杀
   test_url: "https://cp.cloudflare.com/generate_204"
+  # 主地址失败时切换备用地址，不增加单节点最大测速请求数
+  fallback_test_urls:
+    - "https://www.apple.com/library/test/success.html"
   # Mihomo 二进制路径（scripts/download_mihomo.py 下载到此）
   mihomo_path: "bin/mihomo"
   # External Controller
@@ -20,10 +24,27 @@ checker:
   api_port: 9090
   # 每个临时配置最多塞入多少节点（过大可能导致启动慢）
   batch_size: 100
+  cn_chain:
+    enabled: true
+    # 优先尝试上次输出的 CN 节点，再尝试当前订阅中标记为 CN 的节点
+    max_candidates: 5
+    # HTTPS 接口需返回 JSON {"country":"CN"}，用于确认实际出口而非信任节点名字
+    geo_url: "https://ipinfo.io/json"
+  # 可选：让境外 GitHub Runner 通过受你控制的大陆 SOCKS5 出口测速。
+  # 与 cn_chain 互斥。凭据只在环境变量中提供，勿写入仓库。
+  dialer_proxy:
+    enabled: false
+    type: socks5
+    server_env: CN_DIALER_SERVER
+    port_env: CN_DIALER_PORT
+    username_env: CN_DIALER_USERNAME
+    password_env: CN_DIALER_PASSWORD
+    tls: false
 
 filter:
-  max_nodes_total: 500
-  max_nodes_per_country: 50
+  # 未经 Runner 测速的候选节点较多，限制客户端周期性探测开销
+  max_nodes_total: 400
+  max_nodes_per_country: 60
 
 generator:
   include_latency_in_name: true
@@ -34,7 +55,7 @@ generator:
   log_level: info
   ipv6: true
   external_controller: "127.0.0.1:9090"
-  url_test_interval: 300
+  url_test_interval: 900
   url_test_tolerance: 50
   # 写入订阅内 URLTest 组；与 checker.test_url 保持一致，方便客户端测速
   url_test_url: "https://cp.cloudflare.com/generate_204"
