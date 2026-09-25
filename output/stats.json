@@ -1,6 +1,6 @@
 {
   "status": "ok",
-  "updated_at": "2026-09-25T02:48:39Z",
+  "updated_at": "2026-09-25T09:15:26Z",
   "nodes": 400,
   "total": 400,
   "countries": {
@@ -46,9 +46,9 @@
   "pipeline": {
     "sources": 18,
     "downloaded": 18,
-    "raw_nodes": 6284,
-    "parsed": 6284,
-    "duplicates_removed": 765,
+    "raw_nodes": 6215,
+    "parsed": 6215,
+    "duplicates_removed": 737,
     "tested": 0,
     "alive": 0,
     "filtered": 400,
