@@ -1,6 +1,6 @@
 {
   "status": "ok",
-  "updated_at": "2026-10-21T16:26:51Z",
+  "updated_at": "2026-10-21T22:57:06Z",
   "nodes": 400,
   "total": 400,
   "countries": {
@@ -20,6 +20,7 @@
     "FR": 13,
     "GB": 13,
     "IN": 13,
+    "IT": 13,
     "KR": 13,
     "NL": 13,
     "PL": 13,
@@ -27,17 +28,16 @@
     "SE": 13,
     "TW": 13,
     "VN": 13,
-    "IT": 12,
     "TR": 12,
     "IE": 11,
-    "CH": 9,
-    "MY": 8,
+    "MY": 9,
+    "CH": 8,
     "BR": 6,
     "MO": 6,
     "AT": 5,
     "ID": 5,
-    "MX": 5,
     "TH": 5,
+    "MX": 4,
     "BE": 3,
     "NO": 3,
     "DK": 2,
@@ -47,13 +47,13 @@
   "pipeline": {
     "sources": 18,
     "downloaded": 18,
-    "raw_nodes": 7689,
-    "parsed": 7689,
-    "duplicates_removed": 1398,
-    "tested": 399,
-    "alive": 12,
+    "raw_nodes": 7706,
+    "parsed": 7706,
+    "duplicates_removed": 1436,
+    "tested": 0,
+    "alive": 0,
     "filtered": 400,
     "countries": 39,
-    "cn_chain": "verified"
+    "cn_chain": "fallback"
   }
 }
